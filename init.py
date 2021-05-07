@@ -14,6 +14,7 @@ class Doctor(db.Model):
     first_name = db.Column(db.String(50))
     patron_name = db.Column(db.String(50))
     room = db.Column(db.Integer)
+    patients = db.relationship('Patient', backref = 'doctor', lazy = True)
 
     def create(self):
         db.session.add(self)
@@ -36,42 +37,49 @@ class Patient(db.Model):
     first_name = db.Column(db.String(50))
     patron_name = db.Column(db.String(50))
     history = db.Column(db.String(255))
+    doctor_id = db.Column(db.Integer, db.ForeignKey('doctors.id'), nullable = False)
 
     def create(self):
         db.session.add(self)
         db.session.commit()
         return self
 
-    def __init__(self, last_name, first_name, patron_name, history):
+    def __init__(self, last_name, first_name, patron_name, history, doctor_id):
         self.last_name = last_name
         self.first_name = first_name
         self.patron_name = patron_name
         self.history = history
+        self.doctor_id = doctor_id
 
     def __repr__(self):
         return '' % self.id
 
 db.create_all()
 
-class DoctorSchema(ModelSchema):
-    class Meta(ModelSchema.Meta):
-        model = Doctor
-        sqla_session = db.session
-    id = fields.Number(dump_only = True)
-    last_name = fields.String(required = True)
-    first_name = fields.String(required = True)
-    patron_name = fields.String(required = False)
-    room = fields.Number(required = True)
-
 class PatientSchema(ModelSchema):
     class Meta(ModelSchema.Meta):
         model = Patient
         sqla_session = db.session
+        include_fk = True
     id = fields.Number(dump_only = True)
     last_name = fields.String(required = True)
     first_name = fields.String(required = True)
     patron_name = fields.String(required = False)
     history = fields.String(required = False)
+    doctor = fields.Nested(lambda: DoctorSchema(only = ("id", "last_name", "first_name", "patron_name", "room")))
+
+class DoctorSchema(ModelSchema):
+    class Meta(ModelSchema.Meta):
+        model = Doctor
+        sqla_session = db.session
+        include_relationships = True
+    id = fields.Number(dump_only = True)
+    last_name = fields.String(required = True)
+    first_name = fields.String(required = True)
+    patron_name = fields.String(required = False)
+    room = fields.Number(required = True)
+    patients = fields.List(fields.Nested(PatientSchema(exclude = ("doctor",))))
+
 
 @app.route('/doctors', methods = ['GET'])
 def get_doctors():
